@@ -1,108 +1,96 @@
 "use client"
 
-import { AlertCircle, CheckCircle, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/components/ui/use-toast"
-import { useState } from "react"
-import { RapidApiValidator, type ApiKeyValidationResult } from "@/lib/rapidapi-validation"
+import { AlertCircle, X, Check } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import Link from "next/link"
 
-interface ApiKeyBannerProps {
-  title?: string
-  description?: string
-}
+export function ApiKeyBanner() {
+  const [isVisible, setIsVisible] = useState(true)
+  const [hasApiKey, setHasApiKey] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-export function ApiKeyBanner({
-  title = "RapidAPI Key",
-  description = "Enter your RapidAPI key to start using the API.",
-}: ApiKeyBannerProps) {
-  const { toast } = useToast()
-  const [validationResult, setValidationResult] = useState<ApiKeyValidationResult | null>(null)
-  const [isValidating, setIsValidating] = useState(false)
-
-  const validateApiKey = async (keyToValidate?: string) => {
-    setIsValidating(true)
-    try {
-      let result: ApiKeyValidationResult
-
-      if (keyToValidate) {
-        result = await RapidApiValidator.validateApiKey(keyToValidate)
-      } else {
-        result = await RapidApiValidator.validateServerApiKey()
+  useEffect(() => {
+    // Check if the API key is configured
+    const checkApiKey = async () => {
+      try {
+        const response = await fetch("/api/settings/api-keys")
+        const data = await response.json()
+        setHasApiKey(data.hasApiKey)
+      } catch (error) {
+        console.error("Error checking API key:", error)
+      } finally {
+        setIsLoading(false)
       }
-
-      setValidationResult(result)
-
-      if (result.valid) {
-        toast({
-          title: "API Key Valid",
-          description: result.message || "Your RapidAPI key is working correctly!",
-        })
-      } else {
-        toast({
-          title: "API Key Invalid",
-          description: result.error || "Please check your API key configuration.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Validation Error",
-        description: "Failed to validate API key. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsValidating(false)
     }
+
+    checkApiKey()
+  }, [])
+
+  if (!isVisible || isLoading) return null
+
+  if (hasApiKey) {
+    return (
+      <Alert className="relative border-green-500/20 bg-green-500/5 text-green-600 dark:text-green-400">
+        <Check className="h-4 w-4" />
+        <AlertDescription className="flex items-center justify-between w-full">
+          <div className="flex-1 text-sm">
+            <span className="font-medium">API Key configured: </span>
+            <span>Your OpenAI API key is set up and ready to use.</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-green-500 text-green-600 dark:text-green-400 hover:bg-green-500/10"
+              asChild
+            >
+              <Link href="/settings">Update Key</Link>
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6 text-green-600 dark:text-green-400 hover:bg-green-500/10"
+              onClick={() => setIsVisible(false)}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Dismiss</span>
+            </Button>
+          </div>
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-        {validationResult && (
-          <div
-            className={`mt-2 p-2 rounded text-sm ${
-              validationResult.valid
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}
+    <Alert className="relative border-yellow-500/20 bg-yellow-500/5 text-yellow-600 dark:text-yellow-400">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription className="flex items-center justify-between w-full">
+        <div className="flex-1 text-sm">
+          <span className="font-medium">Demo mode: </span>
+          <span>Running with simulated responses. Add your OpenAI API key for full functionality.</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-yellow-500 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/10"
+            asChild
           >
-            {validationResult.valid ? (
-              <div className="flex items-center">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                {validationResult.message}
-                {validationResult.accountsCount !== undefined && (
-                  <span className="ml-2">({validationResult.accountsCount} accounts available)</span>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                {validationResult.error}
-              </div>
-            )}
-          </div>
-        )}
-      </CardHeader>
-      <CardContent>{/* Add your API key input or other relevant content here */}</CardContent>
-      <CardFooter>
-        <Button variant="outline" onClick={() => validateApiKey()} disabled={isValidating} className="mr-2">
-          {isValidating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Testing...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Test API Key
-            </>
-          )}
-        </Button>
-        <Button>Save</Button>
-      </CardFooter>
-    </Card>
+            <Link href="/settings">Add API Key</Link>
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/10"
+            onClick={() => setIsVisible(false)}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Dismiss</span>
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
   )
 }

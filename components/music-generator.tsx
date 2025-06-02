@@ -10,12 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Disc3, Music2, Wand2 } from "lucide-react"
+import { Disc3, Music2, Loader2, Music, Save } from "lucide-react"
 import type { GeneratedMusic } from "./music-video-creator"
 import { AudioPlayer } from "./audio-player"
 import { useToast } from "@/hooks/use-toast"
-import { AIMusicDetails } from "./ai-music-details"
-import { v4 as uuidv4 } from "uuid"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/context/auth-context"
 
 const GENRES = [
   "Pop",
@@ -89,192 +89,175 @@ const VOICE_TYPES = [
   "Rap",
 ]
 
-// Create a fallback music object
-function createFallbackMusic(
-  title: string,
-  genre: string,
-  mood: string,
-  style: string,
-  duration: number,
-): GeneratedMusic {
-  return {
-    id: uuidv4(),
-    title: title || "Untitled Track",
-    audioUrl: "https://samplelib.com/lib/preview/mp3/sample-15s.mp3",
-    genre: genre || "Pop",
-    mood: mood || "Happy",
-    duration: duration || 120,
-    createdAt: new Date(),
-    musicDescription: {
-      musicDescription: `A ${genre || "Pop"} song with a ${mood || "Happy"} mood in ${style || "Vocal"} style.`,
-      structure: ["intro", "verse", "chorus", "verse", "chorus", "bridge", "chorus", "outro"],
-      tempo: 120,
-      key: "C major",
-      instrumentation: ["piano", "guitar", "drums", "bass", "synth"],
-      theme: "Summer vibes and positive energy",
-      melody: "Catchy and uplifting melody with memorable hooks",
-      harmony: "Rich chord progressions with occasional tension and resolution",
-      rhythm: "Steady beat with syncopated elements to add interest",
-    },
-    aiGenerated: true,
-  }
+interface MusicGeneratorProps {
+  onMusicGenerated?: (music: GeneratedMusic) => void
 }
 
-export function MusicGenerator({
-  onMusicGenerated,
-}: {
-  onMusicGenerated: (music: GeneratedMusic) => void
-}) {
+export function MusicGenerator({ onMusicGenerated }: MusicGeneratorProps) {
   const [title, setTitle] = useState("")
   const [lyrics, setLyrics] = useState("")
   const [genre, setGenre] = useState("Pop")
   const [mood, setMood] = useState("Happy")
   const [style, setStyle] = useState("Vocal")
   const [voiceType, setVoiceType] = useState("")
-  const [duration, setDuration] = useState([120]) // in seconds
+  const [duration, setDuration] = useState([120])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("normal")
   const [previewMusic, setPreviewMusic] = useState<GeneratedMusic | null>(null)
   const { toast } = useToast()
+  const router = useRouter()
+  const { user } = useAuth()
 
   const handleGenerate = async () => {
     try {
       setIsGenerating(true)
       setPreviewMusic(null)
 
-      // Create the request payload
+      if (!lyrics.trim() && !title.trim()) {
+        toast({
+          title: "Content Required",
+          description: "Please enter either lyrics/description or a title for your music.",
+          variant: "destructive",
+        })
+        return
+      }
+
       const payload = {
-        title,
-        lyrics,
+        title: title.trim() || "Untitled Track",
+        lyrics: lyrics.trim(),
         genre,
         mood,
         style,
-        voiceType,
+        voiceType: activeTab === "normal" ? voiceType : undefined,
         duration: duration[0],
+        userId: user?.id,
       }
 
       console.log("Generating music with payload:", payload)
 
-      // Determine which API endpoint to use
-      const apiEndpoint = "/api/generate-music"
-      console.log("Using API endpoint:", apiEndpoint)
-
-      // Call our API route to generate music
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch("/api/ai-music-generation", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify(payload),
       })
 
-      console.log("API response status:", response.status)
-
-      // Check if response is ok before trying to parse JSON
       if (!response.ok) {
-        // Try to get error message from response
-        let errorMessage = "Failed to generate music"
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`
         try {
-          const errorText = await response.text()
-          console.log("Error response text:", errorText)
-
-          // Try to parse as JSON first
-          try {
-            const errorData = JSON.parse(errorText)
-            errorMessage = errorData.error || errorData.message || errorMessage
-          } catch {
-            // If not JSON, use the text directly (but truncate if too long)
-            errorMessage = errorText.length > 100 ? errorText.substring(0, 100) + "..." : errorText
-          }
+          const errorData = await response.json()
+          errorMessage = errorData.error || errorData.message || errorMessage
         } catch (parseError) {
-          console.error("Error reading error response:", parseError)
+          const errorText = await response.text()
+          errorMessage = `Server returned ${response.status}. Response: ${errorText.substring(0, 100)}...`
         }
-
         throw new Error(errorMessage)
       }
 
-      // Parse successful response
       let data
       try {
         data = await response.json()
-        console.log("API response data:", data)
       } catch (parseError) {
-        console.error("Error parsing successful API response:", parseError)
-        throw new Error("Failed to parse API response")
+        const responseText = await response.text()
+        console.error("Response text:", responseText)
+        throw new Error("Server returned invalid JSON response")
       }
 
-      // Validate the response data
-      if (!data || !data.id || !data.audioUrl) {
-        console.error("Invalid API response data:", data)
+      if (!data || !data.id) {
         throw new Error("Invalid response from music generation API")
       }
 
-      // Create a properly formatted music object
+      // Create the music object with blob storage integration
       const musicData: GeneratedMusic = {
         id: data.id,
         title: data.title || title || "Untitled Track",
-        audioUrl: data.audioUrl,
-        genre: data.genre || genre || "Pop",
-        mood: data.mood || mood || "Happy",
-        duration: data.duration || duration[0] || 120,
+        audioUrl: data.audioUrl || "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
+        genre: data.genre || genre,
+        mood: data.mood || mood,
+        duration: data.duration || duration[0],
         createdAt: new Date(data.createdAt || Date.now()),
         musicDescription: data.musicDescription || {
-          musicDescription: `A ${genre} song with a ${mood} mood.`,
+          musicDescription: `A ${genre} song with a ${mood} mood in ${style} style.`,
           structure: ["intro", "verse", "chorus", "outro"],
           tempo: 120,
           key: "C major",
           instrumentation: ["piano", "guitar", "drums", "bass"],
         },
-        aiGenerated: data.aiGenerated || false,
+        aiGenerated: data.aiGenerated || true,
+        blobUrl: data.blobUrl, // Store blob URL for permanent storage
       }
 
-      console.log("Formatted music data:", musicData)
-
-      // Set preview music
       setPreviewMusic(musicData)
 
+      if (onMusicGenerated) {
+        onMusicGenerated(musicData)
+      }
+
       toast({
-        title: "Music Generated!",
+        title: "Music Generated Successfully!",
         description: `Your ${genre} track "${musicData.title}" is ready to play.`,
       })
     } catch (error) {
       console.error("Error generating music:", error)
-
-      // Log detailed error information
-      if (error instanceof Error) {
-        console.error("Error name:", error.name)
-        console.error("Error message:", error.message)
-        console.error("Error stack:", error.stack)
-      } else {
-        console.error("Unknown error type:", typeof error)
-      }
-
       let errorMessage = "There was an error generating your music. Please try again."
 
-      // Check if it's an API key error
-      if (error instanceof Error && error.message.includes("API key")) {
-        errorMessage = "OpenAI API key is missing. The app is running in demo mode with simulated responses."
+      if (error instanceof Error) {
+        if (error.message.includes("API key")) {
+          errorMessage = "Music generation service is temporarily unavailable. Please try again later."
+        } else if (error.message.includes("rate limit")) {
+          errorMessage = "Too many requests. Please wait a moment and try again."
+        } else {
+          errorMessage = error.message
+        }
       }
 
       toast({
-        title: "Generation Notice",
+        title: "Generation Failed",
         description: errorMessage,
-        variant: error instanceof Error && error.message.includes("API key") ? "default" : "destructive",
+        variant: "destructive",
       })
-
-      // Create a fallback music object so the user can still proceed
-      const fallbackMusic = createFallbackMusic(title, genre, mood, style, duration[0])
-
-      // Set the fallback music as preview
-      setPreviewMusic(fallbackMusic)
     } finally {
       setIsGenerating(false)
     }
   }
 
-  const handleSaveMusic = () => {
-    if (previewMusic) {
-      onMusicGenerated(previewMusic)
+  const handleSaveMusic = async () => {
+    if (!previewMusic) return
+
+    try {
+      setIsSaving(true)
+
+      // Save music to blob storage and database
+      const response = await fetch("/api/music/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          music: previewMusic,
+          userId: user?.id,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to save music")
+      }
+
+      const result = await response.json()
+
+      // Update the music object with the saved blob URL
+      const savedMusic = {
+        ...previewMusic,
+        blobUrl: result.blobUrl,
+        id: result.id,
+      }
+
+      if (onMusicGenerated) {
+        onMusicGenerated(savedMusic)
+      }
 
       // Reset form
       setTitle("")
@@ -288,8 +271,20 @@ export function MusicGenerator({
 
       toast({
         title: "Music Saved!",
-        description: "Your track has been added to your collection.",
+        description: "Your track has been saved to your library and is ready for video creation.",
       })
+
+      // Navigate to video creation
+      router.push(`/studio?tab=video&musicId=${savedMusic.id}`)
+    } catch (error) {
+      console.error("Error saving music:", error)
+      toast({
+        title: "Save Failed",
+        description: "Failed to save your music. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -299,44 +294,75 @@ export function MusicGenerator({
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`
   }
 
+  const addStructureTag = (tag: string) => {
+    setLyrics((prev) => prev + `\n\n[${tag}]\n`)
+  }
+
   return (
     <div className="container py-6 space-y-6">
       <div className="flex flex-col space-y-2">
-        <h2 className="text-2xl font-bold tracking-tight">Music Creator</h2>
+        <h2 className="text-2xl font-bold tracking-tight">AI Music Creator</h2>
         <p className="text-muted-foreground">Generate original music with AI across various genres and styles</p>
       </div>
 
-      {previewMusic &&
-        (previewMusic.aiGenerated ? (
-          <AIMusicDetails music={previewMusic} onSave={handleSaveMusic} onDiscard={() => setPreviewMusic(null)} />
-        ) : (
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle>Preview Your Generated Music</CardTitle>
-              <CardDescription>Listen to your track before saving it</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AudioPlayer audioUrl={previewMusic.audioUrl} title={previewMusic.title} />
-              <div className="flex gap-2 mt-4">
-                <Badge variant="outline">{previewMusic.genre}</Badge>
-                <Badge variant="outline">{previewMusic.mood}</Badge>
-                <Badge variant="outline">{formatDuration(previewMusic.duration)}</Badge>
+      {previewMusic && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Music className="h-5 w-5" />
+              Preview Your Generated Music
+            </CardTitle>
+            <CardDescription>Listen to your track before saving it to your library</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AudioPlayer audioUrl={previewMusic.audioUrl} title={previewMusic.title} />
+            <div className="flex gap-2 mt-4 flex-wrap">
+              <Badge variant="outline">{previewMusic.genre}</Badge>
+              <Badge variant="outline">{previewMusic.mood}</Badge>
+              <Badge variant="outline">{formatDuration(previewMusic.duration)}</Badge>
+              {previewMusic.aiGenerated && <Badge variant="secondary">AI Generated</Badge>}
+            </div>
+            {previewMusic.musicDescription && (
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <h4 className="font-semibold mb-2">Music Details</h4>
+                <p className="text-sm text-muted-foreground mb-2">{previewMusic.musicDescription.musicDescription}</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <strong>Tempo:</strong> {previewMusic.musicDescription.tempo} BPM
+                  </div>
+                  <div>
+                    <strong>Key:</strong> {previewMusic.musicDescription.key}
+                  </div>
+                </div>
               </div>
-            </CardContent>
-            <CardFooter className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setPreviewMusic(null)}>
-                Discard
-              </Button>
-              <Button onClick={handleSaveMusic}>Save to Collection</Button>
-            </CardFooter>
-          </Card>
-        ))}
+            )}
+          </CardContent>
+          <CardFooter className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPreviewMusic(null)}>
+              Discard
+            </Button>
+            <Button onClick={handleSaveMusic} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save & Create Video
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="normal" className="flex items-center gap-2">
             <Music2 className="h-4 w-4" />
-            <span>Normal</span>
+            <span>Vocal</span>
           </TabsTrigger>
           <TabsTrigger value="instrumental" className="flex items-center gap-2">
             <Disc3 className="h-4 w-4" />
@@ -352,36 +378,22 @@ export function MusicGenerator({
             </CardHeader>
             <CardContent>
               <Textarea
-                placeholder="Enter your lyrics or describe a song. Use tags like [Verse], [Chorus], [Bridge], etc. for structure."
+                placeholder="Enter your lyrics or describe a song. Use tags like [Verse], [Chorus], [Bridge], etc. for structure.&#10;&#10;Example:&#10;[Verse]&#10;Walking down the street on a sunny day&#10;Everything feels like it's going my way&#10;&#10;[Chorus]&#10;This is my moment, this is my time&#10;Everything's perfect, everything's fine"
                 className="min-h-[200px]"
                 value={lyrics}
                 onChange={(e) => setLyrics(e.target.value)}
               />
               <div className="mt-4 flex flex-wrap gap-2">
-                <Badge variant="outline" onClick={() => setLyrics(lyrics + "\n\n[Verse]\n")}>
-                  [Verse]
-                </Badge>
-                <Badge variant="outline" onClick={() => setLyrics(lyrics + "\n\n[Chorus]\n")}>
-                  [Chorus]
-                </Badge>
-                <Badge variant="outline" onClick={() => setLyrics(lyrics + "\n\n[Bridge]\n")}>
-                  [Bridge]
-                </Badge>
-                <Badge variant="outline" onClick={() => setLyrics(lyrics + "\n\n[Intro]\n")}>
-                  [Intro]
-                </Badge>
-                <Badge variant="outline" onClick={() => setLyrics(lyrics + "\n\n[Outro]\n")}>
-                  [Outro]
-                </Badge>
-                <Badge variant="outline" onClick={() => setLyrics(lyrics + "\n\n[Pre-Chorus]\n")}>
-                  [Pre-Chorus]
-                </Badge>
-                <Badge variant="outline" onClick={() => setLyrics(lyrics + "\n\n[Hook]\n")}>
-                  [Hook]
-                </Badge>
-                <Badge variant="outline" onClick={() => setLyrics(lyrics + "\n\n[Break]\n")}>
-                  [Break]
-                </Badge>
+                {["Verse", "Chorus", "Bridge", "Intro", "Outro", "Pre-Chorus"].map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                    onClick={() => addStructureTag(tag)}
+                  >
+                    [{tag}]
+                  </Badge>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -394,7 +406,7 @@ export function MusicGenerator({
             <CardContent>
               <Select value={voiceType} onValueChange={setVoiceType}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select voice type" />
+                  <SelectValue placeholder="Select voice type (optional)" />
                 </SelectTrigger>
                 <SelectContent>
                   {VOICE_TYPES.map((voice) => (
@@ -404,9 +416,6 @@ export function MusicGenerator({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground mt-2">
-                Voice type will adapt to your selected genre and style
-              </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -419,7 +428,7 @@ export function MusicGenerator({
             </CardHeader>
             <CardContent>
               <Textarea
-                placeholder="Describe the instrumental music you want (e.g., 'A cinematic orchestral piece with rising tension and epic climax')"
+                placeholder="Describe the instrumental music you want (e.g., 'A cinematic orchestral piece with rising tension and epic climax', 'Relaxing ambient soundscape with gentle piano and nature sounds', 'Upbeat electronic dance track with heavy bass')"
                 className="min-h-[200px]"
                 value={lyrics}
                 onChange={(e) => setLyrics(e.target.value)}
@@ -439,7 +448,7 @@ export function MusicGenerator({
                 <Label htmlFor="title">Track Title</Label>
                 <Input
                   id="title"
-                  placeholder="Enter a title for your track"
+                  placeholder="Enter a title for your track (optional)"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                 />
@@ -504,16 +513,21 @@ export function MusicGenerator({
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="w-full" onClick={handleGenerate} disabled={isGenerating}>
+              <Button
+                className="w-full"
+                onClick={handleGenerate}
+                disabled={isGenerating || (!lyrics.trim() && !title.trim())}
+                size="lg"
+              >
                 {isGenerating ? (
                   <div className="flex items-center gap-2">
-                    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
-                    <span>Generating...</span>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating Music...
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Wand2 className="h-4 w-4" />
-                    <span>Generate Music</span>
+                    <Music className="h-4 w-4" />
+                    Generate Music
                   </div>
                 )}
               </Button>

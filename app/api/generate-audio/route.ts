@@ -5,6 +5,22 @@ import { existsSync } from "fs"
 import { join } from "path"
 import { v4 as uuidv4 } from "uuid"
 
+// Mock audio URLs for different types of tones
+const TONE_AUDIO_URLS = {
+  low: "https://www.soundjay.com/button/sounds/button-09.mp3",
+  medium: "https://www.soundjay.com/button/sounds/button-10.mp3",
+  high: "https://www.soundjay.com/button/sounds/button-11.mp3",
+  default: "https://www.soundjay.com/button/sounds/button-1.mp3",
+}
+
+// Mock voice URLs for different text lengths
+const VOICE_AUDIO_URLS = {
+  short: "https://www.soundjay.com/human/sounds/man-scream-01.mp3",
+  medium: "https://www.soundjay.com/human/sounds/man-scream-02.mp3",
+  long: "https://www.soundjay.com/human/sounds/man-scream-03.mp3",
+  default: "https://www.soundjay.com/human/sounds/voice-3.mp3",
+}
+
 // Ensure the audio directory exists
 async function ensureAudioDir() {
   const audioDir = join(process.cwd(), "public", "audio")
@@ -25,20 +41,51 @@ async function ensureScriptsDir() {
 
 export async function POST(request: Request) {
   try {
-    const {
-      text,
-      frequencies = [440, 660, 880],
-      durations = [1000, 1000, 1000],
-      amplitudes = [-20, -20, -20],
-    } = await request.json()
+    // Parse the request body
+    const body = await request.json()
+    const { text, frequencies = [440, 660, 880], durations = [1000, 1000, 1000], amplitudes = [-20, -20, -20] } = body
 
     if (!text) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 })
     }
 
+    console.log("Generating audio with parameters:", { text, frequencies, durations, amplitudes })
+
     // Generate unique IDs for the audio files
     const musicId = uuidv4()
     const voiceId = uuidv4()
+
+    // Determine tone type based on average frequency
+    const avgFrequency = frequencies.reduce((sum, freq) => sum + freq, 0) / frequencies.length
+    let toneType = "default"
+    if (avgFrequency < 400) toneType = "low"
+    else if (avgFrequency < 800) toneType = "medium"
+    else toneType = "high"
+
+    // Determine voice type based on text length
+    let voiceType = "default"
+    if (text.length < 20) voiceType = "short"
+    else if (text.length < 100) voiceType = "medium"
+    else voiceType = "long"
+
+    // Add a small delay to simulate processing time
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+
+    // Return mock audio URLs
+    return NextResponse.json({
+      success: true,
+      musicUrl: TONE_AUDIO_URLS[toneType as keyof typeof TONE_AUDIO_URLS] || TONE_AUDIO_URLS.default,
+      voiceUrl: VOICE_AUDIO_URLS[voiceType as keyof typeof VOICE_AUDIO_URLS] || VOICE_AUDIO_URLS.default,
+      metadata: {
+        musicId,
+        voiceId,
+        parameters: {
+          avgFrequency,
+          totalDuration: durations.reduce((sum, dur) => sum + dur, 0),
+          textLength: text.length,
+        },
+      },
+    })
 
     // Ensure directories exist
     const audioDir = await ensureAudioDir()
@@ -133,7 +180,10 @@ print("Audio generation complete")
   } catch (error) {
     console.error("Error generating audio:", error)
     return NextResponse.json(
-      { error: "Failed to generate audio", message: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: "Failed to generate audio",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 },
     )
   }

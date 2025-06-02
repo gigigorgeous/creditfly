@@ -10,11 +10,22 @@ export async function POST(request: Request) {
     }
 
     // Track the play in Redis
-    await trackMusicPlay(musicId, userId || undefined)
+    const success = await trackMusicPlay(musicId, userId)
 
-    return NextResponse.json({ success: true })
+    if (!success) {
+      return NextResponse.json({ error: "Failed to track play" }, { status: 500 })
+    }
+
+    // Get updated play count
+    const { redis } = await import("@/lib/redis")
+    const playCount = await redis.hget(`music:${musicId}`, "plays")
+
+    return NextResponse.json({
+      success: true,
+      playCount: Number(playCount) || 1,
+    })
   } catch (error) {
     console.error("Error tracking play:", error)
-    return NextResponse.json({ error: "Failed to track play" }, { status: 500 })
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

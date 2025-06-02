@@ -1,59 +1,68 @@
-import { v4 as uuidv4 } from "uuid"
-
-// Agent configuration
 export interface AgentConfig {
   name: string
   instructions: string
-  model?: string
+  model: string
+  temperature?: number
+  maxTokens?: number
 }
 
-// Agent result
 export interface AgentResult {
-  id: string
   output: string
-  metadata?: Record<string, any>
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+  }
 }
 
-// Agent class
 export class Agent {
-  private config: AgentConfig
+  protected config: AgentConfig
+  protected apiKey?: string
+  protected baseUrl?: string
 
   constructor(config: AgentConfig, apiKey?: string, baseUrl?: string) {
-    this.config = {
-      ...config,
-      model: config.model || "gpt-4o",
-    }
+    this.config = config
+    this.apiKey = apiKey || process.env.OPENAI_API_KEY
+    this.baseUrl = baseUrl
   }
 
-  async run(input: string): Promise<AgentResult> {
+  async run(prompt: string): Promise<AgentResult> {
     try {
-      // Create a fallback response since we can't rely on OpenAI being available
+      // For demo purposes, return mock data
+      // In production, this would call OpenAI API
+
+      console.log(`Agent ${this.config.name} running with prompt:`, prompt)
+
+      // Simulate API delay
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // Return mock structured response for music generation
+      const mockResponse = {
+        title: "AI Generated Track",
+        genre: "Pop",
+        mood: "Happy",
+        structure: ["intro", "verse", "chorus", "verse", "chorus", "bridge", "chorus", "outro"],
+        tempo: 120,
+        key: "C major",
+        instrumentation: ["piano", "guitar", "drums", "bass", "synth"],
+        musicDescription: "An upbeat pop song with catchy melodies and modern production",
+        theme: "Positive energy and summer vibes",
+        melody: "Catchy and memorable with hook-driven sections",
+        harmony: "Contemporary pop chord progressions",
+        rhythm: "Steady 4/4 beat with syncopated elements",
+      }
+
       return {
-        id: uuidv4(),
-        output: JSON.stringify({
-          title: "Untitled Track",
-          genre: "Pop",
-          mood: "Happy",
-          structure: ["intro", "verse", "chorus", "verse", "chorus", "bridge", "chorus", "outro"],
-          tempo: 120,
-          key: "C major",
-          instrumentation: ["piano", "guitar", "drums", "bass", "synth"],
-          theme: "Summer vibes and positive energy",
-          melody: "Catchy and uplifting melody with memorable hooks",
-          harmony: "Rich chord progressions with occasional tension and resolution",
-          rhythm: "Steady beat with syncopated elements to add interest",
-        }),
+        output: JSON.stringify(mockResponse, null, 2),
+        usage: {
+          promptTokens: 100,
+          completionTokens: 200,
+          totalTokens: 300,
+        },
       }
     } catch (error) {
-      console.error("Agent execution error:", error)
-      throw error
+      console.error(`Agent ${this.config.name} error:`, error)
+      throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
-  }
-}
-
-// Runner class for executing agents
-export class Runner {
-  static async run(agent: Agent, input: string): Promise<AgentResult> {
-    return await agent.run(input)
   }
 }

@@ -6,54 +6,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Key, Save, CheckCircle, AlertCircle } from "lucide-react"
-import { RapidApiValidator, type ApiKeyValidationResult } from "@/lib/rapidapi-validation"
+import { Loader2, Key, Save } from "lucide-react"
 
 export function ApiKeyConfig() {
   const [openAIKey, setOpenAIKey] = useState("")
   const [customBaseUrl, setCustomBaseUrl] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
-  const [validationResult, setValidationResult] = useState<ApiKeyValidationResult | null>(null)
-  const [isValidating, setIsValidating] = useState(false)
-
-  const validateApiKey = async () => {
-    if (!openAIKey) {
-      toast({
-        title: "No API Key",
-        description: "Please enter an API key to validate.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsValidating(true)
-    try {
-      const result = await RapidApiValidator.validateApiKey(openAIKey)
-      setValidationResult(result)
-
-      if (result.valid) {
-        toast({
-          title: "API Key Valid",
-          description: result.message || "Your RapidAPI key is working correctly!",
-        })
-      } else {
-        toast({
-          title: "API Key Invalid",
-          description: result.error || "Please check your API key.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      toast({
-        title: "Validation Error",
-        description: "Failed to validate API key. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsValidating(false)
-    }
-  }
 
   const handleSaveConfig = async () => {
     setIsSaving(true)
@@ -113,30 +72,6 @@ export function ApiKeyConfig() {
             value={openAIKey}
             onChange={(e) => setOpenAIKey(e.target.value)}
           />
-          {validationResult && (
-            <div
-              className={`p-3 rounded-md text-sm ${
-                validationResult.valid
-                  ? "bg-green-50 text-green-700 border border-green-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {validationResult.valid ? (
-                <div className="flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  {validationResult.message}
-                  {validationResult.accountsCount !== undefined && (
-                    <span className="ml-2">({validationResult.accountsCount} accounts available)</span>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  {validationResult.error}
-                </div>
-              )}
-            </div>
-          )}
           <p className="text-sm text-muted-foreground">
             Your API key is stored securely in your browser and never sent to our servers.
           </p>
@@ -154,19 +89,6 @@ export function ApiKeyConfig() {
         </div>
       </CardContent>
       <CardFooter>
-        <Button variant="outline" onClick={validateApiKey} disabled={isValidating || !openAIKey} className="mr-2">
-          {isValidating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Testing...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Test API Key
-            </>
-          )}
-        </Button>
         <Button onClick={handleSaveConfig} disabled={isSaving || !openAIKey}>
           {isSaving ? (
             <>

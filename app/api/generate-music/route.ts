@@ -1,111 +1,58 @@
 import { NextResponse } from "next/server"
+import { KVNamespace } from "@vercel/kv"
 import { v4 as uuidv4 } from "uuid"
-import { getGenreBasedAudioUrl } from "@/lib/music-generation-sdk"
 
-// Create a fallback music data function
-function createFallbackMusicData(options: {
-  title?: string
-  genre?: string
-  mood?: string
-  style?: string
-  duration?: number
-}) {
-  const { title, genre, mood, style, duration } = options
-
-  return {
-    id: uuidv4(),
-    title: title || "Untitled Track",
-    audioUrl: getGenreBasedAudioUrl(genre || "Pop", mood || "Happy"),
-    genre: genre || "Pop",
-    mood: mood || "Happy",
-    duration: duration || 180,
-    createdAt: new Date().toISOString(),
-    musicDescription: {
-      musicDescription: `A ${genre || "Pop"} song with a ${mood || "Happy"} mood in ${style || "Vocal"} style.`,
-      structure: ["intro", "verse", "chorus", "verse", "chorus", "bridge", "chorus", "outro"],
-      tempo: 120,
-      key: "C major",
-      instrumentation: ["piano", "guitar", "drums", "bass", "synth"],
-      theme: "Summer vibes and positive energy",
-      melody: "Catchy and uplifting melody with memorable hooks",
-      harmony: "Rich chord progressions with occasional tension and resolution",
-      rhythm: "Steady beat with syncopated elements to add interest",
-    },
-    aiGenerated: true,
-  }
-}
+// Initialize KV store
+const kv =
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+    ? new KVNamespace({
+        url: process.env.KV_REST_API_URL,
+        token: process.env.KV_REST_API_TOKEN,
+      })
+    : null
 
 export async function POST(request: Request) {
   try {
-    console.log("Generate music API route called")
-
-    // Parse the request body with error handling
-    let body
-    try {
-      body = await request.json()
-      console.log("Request body:", JSON.stringify(body))
-    } catch (parseError) {
-      console.error("Error parsing request body:", parseError)
-      return NextResponse.json(
-        { error: "Invalid request body", message: "Request body must be valid JSON" },
-        { status: 400 },
-      )
+    // Check if KV is initialized
+    if (!kv) {
+      return NextResponse.json({ message: "KV store not configured" }, { status: 500 })
     }
 
-    const { title, lyrics, genre, mood, style, voiceType, duration, userId } = body
+    // Parse request body
+    const body = await request.json()
+    const { prompt, genre } = body
 
-    // Validate required fields
-    if (!genre && !mood && !title) {
-      return NextResponse.json(
-        { error: "Missing required fields", message: "At least one of genre, mood, or title is required" },
-        { status: 400 },
-      )
+    if (!prompt) {
+      return NextResponse.json({ message: "Prompt is required" }, { status: 400 })
     }
 
-    // Generate music data using the fallback function
-    const musicData = createFallbackMusicData({
-      title,
-      genre,
-      mood,
-      style,
-      duration,
+    // Generate a unique ID for the song
+    const songId = uuidv4()
+
+    // In a real implementation, you would call an AI music generation service here
+    // For now, we'll simulate a delay and return a mock audio URL
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    // Mock audio URL (in production, this would be the URL returned by the AI service)
+    const audioUrl = `https://example.com/audio/${songId}.mp3`
+
+    // Store song data in KV store
+    await kv.set(`song:${songId}`, {
+      id: songId,
+      prompt,
+      genre: genre || "unspecified",
+      audioUrl,
+      createdAt: new Date().toISOString(),
+      plays: 0,
     })
 
-    console.log("Generated music data:", JSON.stringify(musicData, null, 2))
-
-    // Ensure we return a valid response
-    console.log("Returning successful response")
-    return NextResponse.json(musicData, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
+    return NextResponse.json({
+      success: true,
+      songId,
+      audioUrl,
     })
   } catch (error) {
-    console.error("Error in generate-music API route:", error)
-
-    // Log detailed error information
-    if (error instanceof Error) {
-      console.error("Error name:", error.name)
-      console.error("Error message:", error.message)
-      console.error("Error stack:", error.stack)
-    } else {
-      console.error("Unknown error type:", typeof error)
-      console.error("Error stringified:", JSON.stringify(error))
-    }
-
-    // Always return valid JSON error response
-    const errorResponse = {
-      error: "Failed to generate music",
-      message: error instanceof Error ? error.message : "Unknown error occurred",
-      timestamp: new Date().toISOString(),
-    }
-
-    return NextResponse.json(errorResponse, {
-      status: 500,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+    console.error("Error generating music:", error)
+    return NextResponse.json({ message: "Failed to generate music" }, { status: 500 })
   }
 }

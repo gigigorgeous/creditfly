@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2, Music, Play, Pause, Save, Plus, Trash } from "lucide-react"
 
@@ -16,7 +16,7 @@ interface ToneSettings {
 }
 
 export function SimpleAudioGenerator() {
-  const [text, setText] = useState("Welcome to AI-generated music.")
+  const [prompt, setPrompt] = useState("")
   const [tones, setTones] = useState<ToneSettings[]>([
     { frequency: 440, duration: 1000, amplitude: -20 },
     { frequency: 660, duration: 1000, amplitude: -20 },
@@ -47,10 +47,10 @@ export function SimpleAudioGenerator() {
   }
 
   const handleGenerateAudio = async () => {
-    if (!text) {
+    if (!prompt.trim()) {
       toast({
-        title: "Text is required",
-        description: "Please enter text for voice generation",
+        title: "Prompt required",
+        description: "Please enter a description for your audio",
         variant: "destructive",
       })
       return
@@ -65,16 +65,22 @@ export function SimpleAudioGenerator() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          text,
+          text: prompt,
           frequencies: tones.map((tone) => tone.frequency),
           durations: tones.map((tone) => tone.duration),
           amplitudes: tones.map((tone) => tone.amplitude),
         }),
       })
 
+      // Check if response is OK before trying to parse JSON
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || "Failed to generate audio")
+        const contentType = response.headers.get("content-type")
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json()
+          throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`)
+        } else {
+          throw new Error(`Error ${response.status}: ${response.statusText}`)
+        }
       }
 
       const result = await response.json()
@@ -150,8 +156,40 @@ export function SimpleAudioGenerator() {
     <div className="container py-6 space-y-6">
       <div className="flex flex-col space-y-2">
         <h2 className="text-2xl font-bold tracking-tight">Simple Audio Generator</h2>
-        <p className="text-muted-foreground">Generate simple tones and voice using Python</p>
+        <p className="text-muted-foreground">Generate simple audio effects and sounds</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Audio Description</CardTitle>
+          <CardDescription>Describe the audio you want to generate</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            placeholder="Describe the audio you want (e.g., 'Rain sounds for relaxation', 'Upbeat drum loop', 'Nature ambience')"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="min-h-[100px]"
+          />
+          <Button
+            onClick={handleGenerateAudio}
+            disabled={isGenerating || !prompt || tones.length === 0}
+            className="w-full"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Music className="mr-2 h-4 w-4" />
+                Generate Audio
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -221,44 +259,6 @@ export function SimpleAudioGenerator() {
             Add Tone
           </Button>
         </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Voice Settings</CardTitle>
-          <CardDescription>Configure the voice for your audio</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="voiceText">Voice Text</Label>
-            <Textarea
-              id="voiceText"
-              placeholder="Enter text for voice generation"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              className="min-h-[100px]"
-            />
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button
-            onClick={handleGenerateAudio}
-            disabled={isGenerating || !text || tones.length === 0}
-            className="w-full"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating Audio...
-              </>
-            ) : (
-              <>
-                <Music className="h-4 w-4 mr-2" />
-                Generate Audio
-              </>
-            )}
-          </Button>
-        </CardFooter>
       </Card>
 
       {(generatedMusic || generatedVoice) && (

@@ -85,9 +85,15 @@ export function AdvancedAudioGenerator({ onMusicGenerated }: AdvancedAudioGenera
         }),
       })
 
+      // Check if response is OK before trying to parse JSON
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || "Failed to generate audio")
+        const contentType = response.headers.get("content-type")
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json()
+          throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`)
+        } else {
+          throw new Error(`Error ${response.status}: ${response.statusText}`)
+        }
       }
 
       const result = await response.json()

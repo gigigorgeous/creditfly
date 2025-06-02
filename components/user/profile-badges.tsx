@@ -1,72 +1,83 @@
 "use client"
-
-import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Award, Crown, Star, Sparkles } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Trophy, Star, TrendingUp, Music, Users, Crown } from "lucide-react"
 
 interface ProfileBadgesProps {
-  badges?: string[]
+  badges: string[]
 }
 
-export function ProfileBadges({ badges = [] }: ProfileBadgesProps) {
-  // Define badge data
-  const badgeData: Record<string, { icon: JSX.Element; label: string; description: string; color: string }> = {
-    "almost-famous": {
-      icon: <Award className="h-4 w-4" />,
-      label: "Almost Famous",
-      description: "Reached 250+ plays in 30 days",
-      color: "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400",
-    },
-    "top-creator": {
-      icon: <Crown className="h-4 w-4" />,
-      label: "Top Creator",
-      description: "Ranked in the top 10 creators",
-      color: "bg-purple-500/20 text-purple-600 dark:text-purple-400",
-    },
-    trending: {
-      icon: <Star className="h-4 w-4" />,
-      label: "Trending",
-      description: "Had content in the trending section",
-      color: "bg-blue-500/20 text-blue-600 dark:text-blue-400",
-    },
-    premium: {
-      icon: <Sparkles className="h-4 w-4" />,
-      label: "Premium",
-      description: "Premium subscription active",
-      color: "bg-green-500/20 text-green-600 dark:text-green-400",
-    },
-  }
+const BADGE_CONFIG = {
+  "almost-famous": {
+    name: "Almost Famous",
+    description: "Reached 1,000+ total plays",
+    icon: Star,
+    color: "bg-yellow-500",
+  },
+  trending: {
+    name: "Trending Artist",
+    description: "Had a track in trending this week",
+    icon: TrendingUp,
+    color: "bg-green-500",
+  },
+  prolific: {
+    name: "Prolific Creator",
+    description: "Created 50+ tracks",
+    icon: Music,
+    color: "bg-blue-500",
+  },
+  "community-favorite": {
+    name: "Community Favorite",
+    description: "Received 100+ likes",
+    icon: Users,
+    color: "bg-purple-500",
+  },
+  "chart-topper": {
+    name: "Chart Topper",
+    description: "Had #1 track on leaderboard",
+    icon: Crown,
+    color: "bg-orange-500",
+  },
+  "early-adopter": {
+    name: "Early Adopter",
+    description: "One of the first 100 users",
+    icon: Trophy,
+    color: "bg-red-500",
+  },
+}
 
-  if (badges.length === 0) {
-    return null
-  }
+export function ProfileBadges({ badges }: ProfileBadgesProps) {
+  if (!badges || badges.length === 0) return null
 
   return (
-    <TooltipProvider>
-      <div className="flex flex-wrap gap-2">
-        {badges.map((badge) => {
-          const badgeInfo = badgeData[badge] || {
-            icon: <Award className="h-4 w-4" />,
-            label: badge,
-            description: "Special badge",
-            color: "bg-gray-500/20 text-gray-600 dark:text-gray-400",
-          }
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Trophy className="h-5 w-5" />
+          Achievements
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {badges.map((badgeId) => {
+            const badge = BADGE_CONFIG[badgeId as keyof typeof BADGE_CONFIG]
+            if (!badge) return null
 
-          return (
-            <Tooltip key={badge}>
-              <TooltipTrigger asChild>
-                <Badge variant="outline" className={`${badgeInfo.color} flex items-center gap-1 px-2 py-1`}>
-                  {badgeInfo.icon}
-                  <span>{badgeInfo.label}</span>
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{badgeInfo.description}</p>
-              </TooltipContent>
-            </Tooltip>
-          )
-        })}
-      </div>
-    </TooltipProvider>
+            const IconComponent = badge.icon
+
+            return (
+              <div key={badgeId} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                <div className={`p-2 rounded-full ${badge.color} text-white`}>
+                  <IconComponent className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium text-sm">{badge.name}</h4>
+                  <p className="text-xs text-muted-foreground">{badge.description}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

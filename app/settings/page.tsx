@@ -1,13 +1,14 @@
-import { ApiKeyConfig } from "@/components/api-key-config"
-import { ApiStatusDashboard } from "@/components/api-status-dashboard"
+import { ApiKeyConfig } from "@/components/settings/api-key-config"
 
 export default function SettingsPage() {
   return (
-    <div className="container relative">
-      <div className="space-y-6">
-        <ApiKeyConfig />
-        <ApiStatusDashboard />
+    <main className="min-h-screen bg-background">
+      <div className="container py-10">
+        <h1 className="text-3xl font-bold mb-6">Settings</h1>
+        <div className="space-y-6">
+          <ApiKeyConfig />
+        </div>
       </div>
-    </div>
+    </main>
   )
 }

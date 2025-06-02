@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { AuthProvider } from "@/contexts/auth-context"
+import { AuthProvider } from "@/context/auth-context"
 
 const inter = Inter({ subsets: ["latin"] })
 

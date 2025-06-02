@@ -1,5 +1,7 @@
 "use client"
 
+import { CardFooter } from "@/components/ui/card"
+
 import type React from "react"
 
 import { useState, useRef } from "react"
@@ -8,12 +10,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Upload, User, Wand2, ImageIcon, Music, Trash2, PlusCircle } from "lucide-react"
+import { Upload, User, Wand2, ImageIcon, Music, Trash2, PlusCircle, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { v4 as uuidv4 } from "uuid"
+import { useRouter } from "next/navigation"
 
 const PERSONA_STYLES = [
   "Pop Star",
@@ -58,6 +61,7 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
   const [previewPersona, setPreviewPersona] = useState<Persona | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const router = useRouter()
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -156,6 +160,30 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
     }
   }
 
+  const handleCreate = async () => {
+    if (!name.trim() || !description.trim()) {
+      toast({
+        title: "Fields required",
+        description: "Please fill in both name and description",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsGenerating(true)
+
+    // Simulate creation
+    setTimeout(() => {
+      setIsGenerating(false)
+      toast({
+        title: "Persona created!",
+        description: `${name} has been created successfully.`,
+      })
+      // Auto-navigate to video creation
+      router.push("/studio?tab=video")
+    }, 3000)
+  }
+
   return (
     <div className="container py-6 space-y-6">
       <div className="flex flex-col space-y-2">
@@ -200,176 +228,223 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
           </CardFooter>
         </Card>
       ) : (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="upload" className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              <span>Upload Photos</span>
-            </TabsTrigger>
-            <TabsTrigger value="details" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              <span>Persona Details</span>
-            </TabsTrigger>
-          </TabsList>
+        <div className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="upload" className="flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                <span>Upload Photos</span>
+              </TabsTrigger>
+              <TabsTrigger value="details" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span>Persona Details</span>
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="upload" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upload Your Photos</CardTitle>
-                <CardDescription>Upload photos of yourself to create your celebrity persona</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div
-                  className="grid place-items-center border-2 border-dashed rounded-lg p-12 cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <div className="flex flex-col items-center gap-2 text-center">
-                    <ImageIcon className="h-10 w-10 text-muted-foreground" />
-                    <h3 className="font-medium">Click to upload photos</h3>
-                    <p className="text-sm text-muted-foreground max-w-xs">
-                      Upload clear photos of your face and full body for best results. We recommend at least 3 different
-                      photos.
-                    </p>
-                    <Input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleFileUpload}
-                    />
-                    <Button variant="secondary" size="sm" className="mt-2">
-                      <Upload className="h-4 w-4 mr-2" />
-                      <span>Select Files</span>
-                    </Button>
+            <TabsContent value="upload" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upload Your Photos</CardTitle>
+                  <CardDescription>Upload photos of yourself to create your celebrity persona</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div
+                    className="grid place-items-center border-2 border-dashed rounded-lg p-12 cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="flex flex-col items-center gap-2 text-center">
+                      <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                      <h3 className="font-medium">Click to upload photos</h3>
+                      <p className="text-sm text-muted-foreground max-w-xs">
+                        Upload clear photos of your face and full body for best results. We recommend at least 3
+                        different photos.
+                      </p>
+                      <Input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
+                      <Button variant="secondary" size="sm" className="mt-2">
+                        <Upload className="h-4 w-4 mr-2" />
+                        <span>Select Files</span>
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
-                {images.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="font-medium">Uploaded Images ({images.length})</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                      {images.map((image) => (
-                        <div key={image.id} className="relative group">
-                          <div className="aspect-square rounded-md overflow-hidden">
-                            <img
-                              src={image.url || "/placeholder.svg"}
-                              alt="Uploaded image"
-                              className="w-full h-full object-cover"
-                            />
+                  {images.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="font-medium">Uploaded Images ({images.length})</h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {images.map((image) => (
+                          <div key={image.id} className="relative group">
+                            <div className="aspect-square rounded-md overflow-hidden">
+                              <img
+                                src={image.url || "/placeholder.svg"}
+                                alt="Uploaded image"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 rounded-md">
+                              <Select
+                                value={image.type}
+                                onValueChange={(value) =>
+                                  handleUpdateImageType(image.id, value as PersonaImage["type"])
+                                }
+                              >
+                                <SelectTrigger className="h-8 text-xs bg-black/60 border-0 text-white">
+                                  <SelectValue placeholder="Image type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="face">Face</SelectItem>
+                                  <SelectItem value="full-body">Full Body</SelectItem>
+                                  <SelectItem value="performance">Performance</SelectItem>
+                                  <SelectItem value="other">Other</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                className="h-8 w-8 mt-2"
+                                onClick={() => handleRemoveImage(image.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Badge variant="secondary" className="absolute bottom-1 right-1 text-xs">
+                              {image.type}
+                            </Badge>
                           </div>
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-2 rounded-md">
-                            <Select
-                              value={image.type}
-                              onValueChange={(value) => handleUpdateImageType(image.id, value as PersonaImage["type"])}
-                            >
-                              <SelectTrigger className="h-8 text-xs bg-black/60 border-0 text-white">
-                                <SelectValue placeholder="Image type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="face">Face</SelectItem>
-                                <SelectItem value="full-body">Full Body</SelectItem>
-                                <SelectItem value="performance">Performance</SelectItem>
-                                <SelectItem value="other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              className="h-8 w-8 mt-2"
-                              onClick={() => handleRemoveImage(image.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <Badge variant="secondary" className="absolute bottom-1 right-1 text-xs">
-                            {image.type}
-                          </Badge>
+                        ))}
+                        <div
+                          className="aspect-square rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <PlusCircle className="h-8 w-8 text-muted-foreground" />
                         </div>
-                      ))}
-                      <div
-                        className="aspect-square rounded-md border-2 border-dashed flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <PlusCircle className="h-8 w-8 text-muted-foreground" />
                       </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => setActiveTab("details")} disabled={images.length === 0}>
-                  Next: Persona Details
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="details" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Persona Details</CardTitle>
-                <CardDescription>Define your celebrity persona's identity and style</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Persona Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Enter a stage name for your persona"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="style">Celebrity Style</Label>
-                  <Select value={style} onValueChange={setStyle}>
-                    <SelectTrigger id="style">
-                      <SelectValue placeholder="Select celebrity style" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERSONA_STYLES.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Persona Description</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Describe your persona's background, style, and personality"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="min-h-[100px]"
-                  />
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => setActiveTab("upload")}>
-                  Back to Photos
-                </Button>
-                <Button onClick={handleGenerate} disabled={isGenerating || images.length === 0}>
-                  {isGenerating ? (
-                    <div className="flex items-center gap-2">
-                      <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
-                      <span>Creating Persona...</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <Wand2 className="h-4 w-4" />
-                      <span>Create Persona</span>
-                    </div>
                   )}
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" onClick={() => setActiveTab("details")} disabled={images.length === 0}>
+                    Next: Persona Details
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="details" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Persona Details</CardTitle>
+                  <CardDescription>Define your celebrity persona's identity and style</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Persona Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="Enter a stage name for your persona"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="style">Celebrity Style</Label>
+                    <Select value={style} onValueChange={setStyle}>
+                      <SelectTrigger id="style">
+                        <SelectValue placeholder="Select celebrity style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PERSONA_STYLES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Persona Description</Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Describe your persona's background, style, and personality"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" onClick={() => setActiveTab("upload")}>
+                    Back to Photos
+                  </Button>
+                  <Button onClick={handleGenerate} disabled={isGenerating || images.length === 0}>
+                    {isGenerating ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
+                        <span>Creating Persona...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Wand2 className="h-4 w-4" />
+                        <span>Create Persona</span>
+                      </div>
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Create New Persona</CardTitle>
+              <CardDescription>Define the characteristics of your AI persona</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Persona Name</Label>
+                <Input
+                  id="name"
+                  placeholder="Enter persona name..."
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe the persona's appearance, personality, and characteristics..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="min-h-[150px]"
+                />
+              </div>
+
+              <Button onClick={handleCreate} disabled={isGenerating} className="w-full">
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Persona...
+                  </>
+                ) : (
+                  <>
+                    <User className="mr-2 h-4 w-4" />
+                    Create Persona
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {existingPersonas.length > 0 && (
