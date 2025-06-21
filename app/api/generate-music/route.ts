@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
-import { KVNamespace } from "@vercel/kv"
+import { createClient } from "@vercel/kv" // Corrected import
 import { v4 as uuidv4 } from "uuid"
 
 // Initialize KV store
 const kv =
   process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
-    ? new KVNamespace({
+    ? createClient({
+        // Corrected instantiation
         url: process.env.KV_REST_API_URL,
         token: process.env.KV_REST_API_TOKEN,
       })
@@ -55,4 +56,17 @@ export async function POST(request: Request) {
     console.error("Error generating music:", error)
     return NextResponse.json({ message: "Failed to generate music" }, { status: 500 })
   }
+}
+
+// Added empty handlers for other HTTP methods to prevent "Method not allowed" errors during deployment checks
+export async function GET() {
+  return NextResponse.json({ error: "Method not allowed. Use POST to generate music." }, { status: 405 })
+}
+
+export async function PUT() {
+  return NextResponse.json({ error: "Method not allowed. Use POST to generate music." }, { status: 405 })
+}
+
+export async function DELETE() {
+  return NextResponse.json({ error: "Method not allowed. Use POST to generate music." }, { status: 405 })
 }

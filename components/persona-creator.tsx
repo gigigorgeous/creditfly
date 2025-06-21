@@ -47,11 +47,11 @@ export type Persona = {
 }
 
 interface PersonaCreatorProps {
-  onPersonaCreated: (persona: Persona) => void
-  existingPersonas: Persona[]
+  onPersonaCreated?: (persona: Persona) => void
+  existingPersonas?: Persona[]
 }
 
-export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCreatorProps) {
+export function PersonaCreator({ onPersonaCreated, existingPersonas = [] }: PersonaCreatorProps) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [style, setStyle] = useState("")
@@ -97,7 +97,7 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
   }
 
   const handleGenerate = async () => {
-    if (images.length === 0) {
+    if (!images || images.length === 0) {
       toast({
         title: "No Images",
         description: "Please upload at least one image to create a persona.",
@@ -143,7 +143,7 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
   }
 
   const handleSavePersona = () => {
-    if (previewPersona) {
+    if (previewPersona && onPersonaCreated) {
       onPersonaCreated(previewPersona)
 
       // Reset form
@@ -172,17 +172,49 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
 
     setIsGenerating(true)
 
-    // Simulate creation
-    setTimeout(() => {
-      setIsGenerating(false)
+    try {
+      // Simulate creation
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+
+      const newPersona: Persona = {
+        id: uuidv4(),
+        name: name.trim(),
+        description: description.trim(),
+        style: style || "Pop Star",
+        images: [],
+        createdAt: new Date(),
+      }
+
+      if (onPersonaCreated) {
+        onPersonaCreated(newPersona)
+      }
+
+      // Reset form
+      setName("")
+      setDescription("")
+      setStyle("")
+
       toast({
         title: "Persona created!",
         description: `${name} has been created successfully.`,
       })
+
       // Auto-navigate to video creation
       router.push("/studio?tab=video")
-    }, 3000)
+    } catch (error) {
+      console.error("Error creating persona:", error)
+      toast({
+        title: "Creation Failed",
+        description: "There was an error creating your persona. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGenerating(false)
+    }
   }
+
+  // Ensure existingPersonas is always an array
+  const safeExistingPersonas = Array.isArray(existingPersonas) ? existingPersonas : []
 
   return (
     <div className="container py-6 space-y-6">
@@ -205,18 +237,19 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
                 <Badge variant="outline">{previewPersona.style}</Badge>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {previewPersona.images.slice(0, 4).map((image) => (
-                  <div key={image.id} className="relative aspect-square rounded-md overflow-hidden">
-                    <img
-                      src={image.url || "/placeholder.svg"}
-                      alt={`${previewPersona.name} - ${image.type}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <Badge variant="secondary" className="absolute bottom-1 right-1 text-xs">
-                      {image.type}
-                    </Badge>
-                  </div>
-                ))}
+                {previewPersona.images &&
+                  previewPersona.images.slice(0, 4).map((image) => (
+                    <div key={image.id} className="relative aspect-square rounded-md overflow-hidden">
+                      <img
+                        src={image.url || "/placeholder.svg"}
+                        alt={`${previewPersona.name} - ${image.type}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <Badge variant="secondary" className="absolute bottom-1 right-1 text-xs">
+                        {image.type}
+                      </Badge>
+                    </div>
+                  ))}
               </div>
             </div>
           </CardContent>
@@ -274,7 +307,7 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
                     </div>
                   </div>
 
-                  {images.length > 0 && (
+                  {images && images.length > 0 && (
                     <div className="space-y-4">
                       <h3 className="font-medium">Uploaded Images ({images.length})</h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -329,7 +362,11 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
                   )}
                 </CardContent>
                 <CardFooter className="flex justify-between">
-                  <Button variant="outline" onClick={() => setActiveTab("details")} disabled={images.length === 0}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setActiveTab("details")}
+                    disabled={!images || images.length === 0}
+                  >
                     Next: Persona Details
                   </Button>
                 </CardFooter>
@@ -384,7 +421,7 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
                   <Button variant="outline" onClick={() => setActiveTab("upload")}>
                     Back to Photos
                   </Button>
-                  <Button onClick={handleGenerate} disabled={isGenerating || images.length === 0}>
+                  <Button onClick={handleGenerate} disabled={isGenerating || !images || images.length === 0}>
                     {isGenerating ? (
                       <div className="flex items-center gap-2">
                         <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></div>
@@ -447,11 +484,11 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
         </div>
       )}
 
-      {existingPersonas.length > 0 && (
+      {safeExistingPersonas.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Your Personas</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {existingPersonas.map((persona) => (
+            {safeExistingPersonas.map((persona) => (
               <Card key={persona.id}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">{persona.name}</CardTitle>
@@ -459,15 +496,16 @@ export function PersonaCreator({ onPersonaCreated, existingPersonas }: PersonaCr
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-2 gap-2 mb-4">
-                    {persona.images.slice(0, 4).map((image) => (
-                      <div key={image.id} className="aspect-square rounded-md overflow-hidden">
-                        <img
-                          src={image.url || "/placeholder.svg"}
-                          alt={`${persona.name} - ${image.type}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
+                    {persona.images &&
+                      persona.images.slice(0, 4).map((image) => (
+                        <div key={image.id} className="aspect-square rounded-md overflow-hidden">
+                          <img
+                            src={image.url || "/placeholder.svg"}
+                            alt={`${persona.name} - ${image.type}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
                   </div>
                   <Badge variant="outline">{persona.style}</Badge>
                 </CardContent>
