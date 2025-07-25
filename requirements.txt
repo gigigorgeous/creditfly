@@ -1,0 +1,9 @@
+streamlit
+numpy
+scipy
+librosa
+soundfile
+matplotlib
+aiohttp
+python-dotenv
+replicate
