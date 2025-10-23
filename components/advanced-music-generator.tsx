@@ -1,244 +1,454 @@
 "use client"
 
-import * as React from "react"
-import { Textarea } from "@/components/ui/textarea"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
-import { Music, Loader2, Settings } from "lucide-react"
-import { MusicPlayerCard } from "@/components/music-player-card"
-import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Loader2, Music, Download, Share, Heart, MoreHorizontal, Sparkles, Wand2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { AudioPlayer } from "./audio-player"
 
-interface GeneratedMusic {
-  audioUrl: string
+interface MusicTrack {
+  id: string
   title: string
-  artist: string
-  genre: string
-  duration: string
-  bpm: number
-  keySignature: string
+  audioUrl: string
+  videoUrl?: string
+  thumbnailUrl?: string
+  duration?: number
+  status: "queued" | "streaming" | "complete" | "error"
+  createdAt: string
+  prompt?: string
+  gptDescription?: string
+  tags?: string
+  modelVersion?: string
 }
 
 export function AdvancedMusicGenerator() {
-  const [prompt, setPrompt] = React.useState("")
-  const [selectedMode, setSelectedMode] = React.useState<string>("none")
-  const [selectedGenre, setSelectedGenre] = React.useState<string>("electronic")
-  const [duration, setDuration] = React.useState([30])
-  const [creativity, setCreativity] = React.useState([0.7])
-  const [generatedMusic, setGeneratedMusic] = React.useState<GeneratedMusic | null>(null)
-  const [isLoading, setIsLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  const [showAdvanced, setShowAdvanced] = React.useState(false)
+  // Basic fields
+  const [title, setTitle] = useState("")
+  const [prompt, setPrompt] = useState("")
+  const [gptDescription, setGptDescription] = useState("")
+  const [lyrics, setLyrics] = useState("")
+  const [tags, setTags] = useState("")
+  const [negativeTags, setNegativeTags] = useState("")
+  const [instrumental, setInstrumental] = useState(false)
+  const [modelVersion, setModelVersion] = useState("chirp-bluejay")
+
+  // Advanced controls
+  const [styleWeight, setStyleWeight] = useState(0.5)
+  const [audioWeight, setAudioWeight] = useState(0.5)
+  const [weirdnessConstraint, setWeirdnessConstraint] = useState(0.5)
+  const [vocalGender, setVocalGender] = useState<"f" | "m" | undefined>(undefined)
+
+  // State
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [currentTrack, setCurrentTrack] = useState<MusicTrack | null>(null)
+  const [generatedTracks, setGeneratedTracks] = useState<MusicTrack[]>([])
+  const [mode, setMode] = useState<"description" | "custom">("description")
+
   const { toast } = useToast()
 
-  const genres = [
-    "electronic",
-    "pop",
-    "rock",
-    "jazz",
-    "classical",
-    "hip-hop",
-    "ambient",
-    "techno",
-    "house",
-    "trance",
-    "dubstep",
-    "drum-and-bass",
-  ]
+  const handleGenerate = async () => {
+    if (mode === "description" && !gptDescription.trim()) {
+      toast({
+        title: "Input Required",
+        description: "Please enter a description for your music.",
+        variant: "destructive",
+      })
+      return
+    }
 
-  const modes = [
-    { value: "none", label: "No specific mode" },
-    { value: "ionian", label: "Ionian (Major)" },
-    { value: "dorian", label: "Dorian" },
-    { value: "phrygian", label: "Phrygian" },
-    { value: "lydian", label: "Lydian" },
-    { value: "mixolydian", label: "Mixolydian" },
-    { value: "aeolian", label: "Aeolian (Natural Minor)" },
-    { value: "locrian", label: "Locrian" },
-  ]
+    if (mode === "custom" && !prompt.trim() && !lyrics.trim()) {
+      toast({
+        title: "Input Required",
+        description: "Please enter either a prompt or lyrics.",
+        variant: "destructive",
+      })
+      return
+    }
 
-  const handleGenerateMusic = async () => {
-    setIsLoading(true)
-    setError(null)
-    setGeneratedMusic(null)
+    setIsGenerating(true)
 
     try {
-      const enhancedPrompt = `${selectedGenre} music, ${prompt}`
+      const requestBody: any = {
+        title: title || "Untitled Track",
+        instrumental,
+        modelVersion,
+        styleWeight,
+        audioWeight,
+        weirdnessConstraint,
+        vocalGender,
+      }
 
-      const response = await fetch("/api/generate-music", {
+      if (mode === "description") {
+        requestBody.gptDescription = gptDescription
+      } else {
+        requestBody.prompt = prompt
+        requestBody.lyrics = lyrics
+        requestBody.tags = tags
+        requestBody.negativeTags = negativeTags
+      }
+
+      const response = await fetch("/api/music/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          prompt: enhancedPrompt,
-          mode: selectedMode,
-          duration: duration[0],
-          creativity: creativity[0],
-        }),
+        body: JSON.stringify(requestBody),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to generate music")
+        const error = await response.json()
+        throw new Error(error.message || "Failed to generate music")
       }
 
-      const data: GeneratedMusic = await response.json()
-      setGeneratedMusic(data)
+      const data = await response.json()
 
       toast({
-        title: "Music Generated!",
-        description: "Your AI-powered track is ready to play.",
+        title: "Generation Started",
+        description: `Your music is being generated. Task ID: ${data.id}`,
       })
-    } catch (err: any) {
-      setError(err.message)
+
+      // Start polling
+      pollTrackStatus(data.id)
+    } catch (error) {
+      console.error("Error generating music:", error)
       toast({
-        title: "Error generating music",
-        description: err.message,
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
         variant: "destructive",
       })
-    } finally {
-      setIsLoading(false)
+      setIsGenerating(false)
     }
   }
 
+  const pollTrackStatus = async (taskId: string) => {
+    const maxAttempts = 60
+    let attempts = 0
+
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`/api/music/${taskId}`)
+        if (response.ok) {
+          const track = await response.json()
+
+          // Handle multiple tracks
+          if (track.tracks) {
+            const completedTracks = track.tracks.filter((t: MusicTrack) => t.status === "complete")
+            if (completedTracks.length > 0) {
+              setGeneratedTracks((prev) => [...completedTracks, ...prev])
+              setCurrentTrack(completedTracks[0])
+              setIsGenerating(false)
+              toast({
+                title: "Music Generated!",
+                description: `${completedTracks.length} track(s) ready to play.`,
+              })
+              return true
+            }
+          } else {
+            // Single track
+            if (track.status === "complete") {
+              setGeneratedTracks((prev) => [track, ...prev])
+              setCurrentTrack(track)
+              setIsGenerating(false)
+              toast({
+                title: "Music Generated!",
+                description: "Your track is ready to play.",
+              })
+              return true
+            } else if (track.status === "error") {
+              setIsGenerating(false)
+              toast({
+                title: "Generation Failed",
+                description: "There was an error generating your music.",
+                variant: "destructive",
+              })
+              return true
+            }
+          }
+        }
+
+        attempts++
+        if (attempts >= maxAttempts) {
+          setIsGenerating(false)
+          toast({
+            title: "Timeout",
+            description: "Music generation is taking longer than expected. Please check back later.",
+            variant: "destructive",
+          })
+          return true
+        }
+
+        return false
+      } catch (error) {
+        console.error("Error checking status:", error)
+        return false
+      }
+    }
+
+    const poll = async () => {
+      const finished = await checkStatus()
+      if (!finished) {
+        setTimeout(poll, 5000)
+      }
+    }
+
+    poll()
+  }
+
   return (
-    <div className="space-y-6">
-      <Card className="w-full max-w-4xl mx-auto bg-gray-800 text-gray-50 border-gray-700">
+    <div className="w-full max-w-6xl mx-auto p-6 space-y-6">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <Music className="w-6 h-6 text-purple-400" />
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-6 w-6" />
             Advanced AI Music Generator
           </CardTitle>
+          <CardDescription>
+            Generate professional music with Suno v5 (Crow) - Full control over every parameter
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Main Prompt */}
-          <div>
-            <label htmlFor="music-prompt" className="block text-sm font-medium text-gray-300 mb-2">
-              Describe the music you want to create:
-            </label>
-            <Textarea
-              id="music-prompt"
-              placeholder="e.g., An upbeat track with driving bassline and ethereal pads, melancholic piano piece with strings, energetic rock anthem about freedom"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="bg-gray-900 border-gray-700 text-gray-50 placeholder:text-gray-500 focus-visible:ring-purple-500"
-              rows={3}
-              disabled={isLoading}
-            />
-          </div>
+        <CardContent>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as "description" | "custom")} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="description">
+                <Wand2 className="h-4 w-4 mr-2" />
+                Simple Description
+              </TabsTrigger>
+              <TabsTrigger value="custom">
+                <Music className="h-4 w-4 mr-2" />
+                Custom Mode
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Quick Genre Selection */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {genres.slice(0, 8).map((genre) => (
-              <Badge
-                key={genre}
-                variant={selectedGenre === genre ? "default" : "outline"}
-                className={`cursor-pointer text-center py-2 ${
-                  selectedGenre === genre ? "bg-purple-600 text-white" : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                }`}
-                onClick={() => setSelectedGenre(genre)}
-              >
-                {genre.charAt(0).toUpperCase() + genre.slice(1)}
-              </Badge>
-            ))}
-          </div>
+            <TabsContent value="description" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="gpt-description">Describe Your Music</Label>
+                <Textarea
+                  id="gpt-description"
+                  placeholder="e.g., An upbeat pop song about summer vacation"
+                  value={gptDescription}
+                  onChange={(e) => setGptDescription(e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
+            </TabsContent>
 
-          {/* Advanced Settings Toggle */}
-          <Button
-            variant="ghost"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-purple-400 hover:text-purple-300"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            {showAdvanced ? "Hide" : "Show"} Advanced Settings
-          </Button>
+            <TabsContent value="custom" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="lyrics">Lyrics</Label>
+                <Textarea
+                  id="lyrics"
+                  placeholder="[Verse]
+Your lyrics here...
 
-          {/* Advanced Settings */}
-          {showAdvanced && (
-            <div className="space-y-4 p-4 bg-gray-900 rounded-lg border border-gray-700">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Musical Mode:</label>
-                <Select value={selectedMode} onValueChange={setSelectedMode} disabled={isLoading}>
-                  <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-50">
+[Chorus]
+..."
+                  value={lyrics}
+                  onChange={(e) => setLyrics(e.target.value)}
+                  className="min-h-[200px] font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tags">Style Tags</Label>
+                  <Input
+                    id="tags"
+                    placeholder="e.g., pop, energetic, female vocals"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="negative-tags">Negative Tags</Label>
+                  <Input
+                    id="negative-tags"
+                    placeholder="e.g., slow, acoustic"
+                    value={negativeTags}
+                    onChange={(e) => setNegativeTags(e.target.value)}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="mt-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Track Title</Label>
+                <Input
+                  id="title"
+                  placeholder="Enter track title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="model">Model Version</Label>
+                <Select value={modelVersion} onValueChange={setModelVersion}>
+                  <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-600 text-gray-50">
-                    {modes.map((mode) => (
-                      <SelectItem key={mode.value} value={mode.value}>
-                        {mode.label}
-                      </SelectItem>
-                    ))}
+                  <SelectContent>
+                    <SelectItem value="chirp-crow">v5 (Crow) - Latest</SelectItem>
+                    <SelectItem value="chirp-bluejay">v4.5+ (Bluejay)</SelectItem>
+                    <SelectItem value="chirp-auk">v4.5 (Auk)</SelectItem>
+                    <SelectItem value="chirp-v4">v4.0</SelectItem>
+                    <SelectItem value="chirp-v3.5">v3.5</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Duration: {duration[0]} seconds</label>
-                <Slider
-                  value={duration}
-                  onValueChange={setDuration}
-                  max={60}
-                  min={10}
-                  step={5}
-                  className="w-full"
-                  disabled={isLoading}
-                />
+            <div className="flex items-center space-x-2">
+              <Switch id="instrumental" checked={instrumental} onCheckedChange={setInstrumental} />
+              <Label htmlFor="instrumental">Instrumental (No Vocals)</Label>
+            </div>
+
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="font-semibold">Advanced Controls</h3>
+
+              <div className="space-y-2">
+                <Label>Style Weight: {styleWeight.toFixed(2)}</Label>
+                <Slider value={[styleWeight]} onValueChange={(v) => setStyleWeight(v[0])} max={1} min={0} step={0.01} />
+                <p className="text-xs text-muted-foreground">
+                  Controls how strongly the style tags influence the generation
+                </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Creativity: {creativity[0].toFixed(1)}
-                </label>
+              <div className="space-y-2">
+                <Label>Weirdness: {weirdnessConstraint.toFixed(2)}</Label>
                 <Slider
-                  value={creativity}
-                  onValueChange={setCreativity}
+                  value={[weirdnessConstraint]}
+                  onValueChange={(v) => setWeirdnessConstraint(v[0])}
                   max={1}
-                  min={0.1}
-                  step={0.1}
-                  className="w-full"
-                  disabled={isLoading}
+                  min={0}
+                  step={0.01}
                 />
+                <p className="text-xs text-muted-foreground">Higher values create more experimental results</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vocal-gender">Vocal Gender</Label>
+                <Select value={vocalGender} onValueChange={(v) => setVocalGender(v as "f" | "m" | undefined)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Auto (Let AI decide)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto (Let AI decide)</SelectItem>
+                    <SelectItem value="f">Female</SelectItem>
+                    <SelectItem value="m">Male</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Generate Button */}
-          <Button
-            onClick={handleGenerateMusic}
-            disabled={isLoading || !prompt.trim()}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-700 hover:to-blue-600 text-white py-3"
-          >
-            {isLoading ? (
+          {currentTrack && (
+            <div className="mt-6 p-4 bg-muted rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-medium">{currentTrack.title}</h3>
+                <Badge variant={currentTrack.status === "complete" ? "default" : "secondary"}>
+                  {currentTrack.status}
+                </Badge>
+              </div>
+
+              {currentTrack.status === "complete" && currentTrack.audioUrl && (
+                <AudioPlayer audioUrl={currentTrack.audioUrl} title={currentTrack.title} />
+              )}
+
+              {currentTrack.status === "streaming" && (
+                <div className="flex items-center space-x-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Generating...</span>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleGenerate} disabled={isGenerating} className="w-full" size="lg">
+            {isGenerating ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generating Music... (This may take 1-2 minutes)
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Generating...
               </>
             ) : (
               <>
-                <Music className="mr-2 h-4 w-4" />
+                <Sparkles className="mr-2 h-5 w-5" />
                 Generate Music
               </>
             )}
           </Button>
+        </CardFooter>
+      </Card>
 
-          {/* Error Display */}
-          {error && (
-            <div className="p-4 bg-red-900/20 border border-red-700 rounded-lg">
-              <p className="text-red-400 text-sm">{error}</p>
+      {/* Generated Tracks Library */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Music Library</CardTitle>
+          <CardDescription>{generatedTracks.length} track(s) generated</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {generatedTracks.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Music className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No tracks generated yet. Create your first track above!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {generatedTracks.map((track) => (
+                <Card key={track.id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium truncate">{track.title}</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {track.modelVersion}
+                      </Badge>
+                    </div>
+
+                    {track.thumbnailUrl && (
+                      <img
+                        src={track.thumbnailUrl || "/placeholder.svg"}
+                        alt={track.title}
+                        className="w-full h-32 object-cover rounded mb-2"
+                      />
+                    )}
+
+                    {track.audioUrl && <AudioPlayer audioUrl={track.audioUrl} title={track.title} />}
+
+                    <div className="flex items-center justify-between mt-2">
+                      <div className="flex space-x-1">
+                        <Button size="sm" variant="ghost">
+                          <Heart className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost">
+                          <Share className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Button size="sm" variant="ghost">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Generated Music Player */}
-      {generatedMusic && (
-        <div className="w-full max-w-4xl mx-auto">
-          <MusicPlayerCard {...generatedMusic} />
-        </div>
-      )}
     </div>
   )
 }
