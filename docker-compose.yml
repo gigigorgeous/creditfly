@@ -1,0 +1,14 @@
+services:
+  music-engine:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      MUSIC_OUTPUT_DIR: /app/data/generated
+      CORS_ORIGINS: http://localhost:3000
+    volumes:
+      - music-generated:/app/data/generated
+    restart: unless-stopped
+
+volumes:
+  music-generated:
