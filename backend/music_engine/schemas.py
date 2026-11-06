@@ -24,6 +24,14 @@ class GenerationRequest(BaseModel):
         return value
 
 
+class PreviewNote(BaseModel):
+    track: str
+    pitch: int = Field(ge=0, le=127)
+    start: float = Field(ge=0)
+    end: float = Field(gt=0)
+    velocity: int = Field(ge=0, le=127)
+
+
 class GenerationResponse(BaseModel):
     id: UUID
     title: str
@@ -33,6 +41,7 @@ class GenerationResponse(BaseModel):
     tempo: int
     bars: int
     tracks: list[str]
+    preview: list[PreviewNote]
     download_url: str
 
 

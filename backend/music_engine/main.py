@@ -8,15 +8,15 @@ from fastapi.responses import FileResponse
 
 from .composition import compose
 from .config import settings
-from .schemas import GenerationRecord, GenerationRequest, GenerationResponse, HealthResponse
+from .schemas import GenerationRecord, GenerationRequest, GenerationResponse, HealthResponse, PreviewNote
 
-app = FastAPI(title="AI Music Engine", version="0.1.0", description="Generate editable multi-track MIDI sketches for your DAW.")
+app = FastAPI(title="AI Music Engine", version="0.2.0", description="Generate editable multi-track MIDI sketches for your DAW.")
 origins = settings.parsed_cors_origins()
 if origins:
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"],
                        allow_headers=["Content-Type"])
 
-# Local-development metadata registry. Use a persistent database/job queue for multi-worker deployments.
+# Local-development metadata registry. Use persistent metadata/job storage in production.
 records: dict[UUID, GenerationRecord] = {}
 
 
@@ -38,9 +38,12 @@ def create_generation(request: GenerationRequest) -> GenerationResponse:
     except OSError as exc:
         raise HTTPException(status_code=500, detail="Could not save generated MIDI file") from exc
 
+    preview = [PreviewNote(track=instrument.name, pitch=note.pitch, start=note.start,
+                           end=note.end, velocity=note.velocity)
+               for instrument in arrangement.midi.instruments for note in instrument.notes]
     record = GenerationRecord(id=identifier, title=arrangement.title, genre=request.genre,
                               key=request.key, mode=request.mode, tempo=request.tempo, bars=request.bars,
-                              tracks=arrangement.tracks,
+                              tracks=arrangement.tracks, preview=preview,
                               download_url=f"/api/v1/generations/{identifier}/download",
                               file_path=str(file_path))
     records[identifier] = record
